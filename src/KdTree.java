@@ -26,7 +26,7 @@ public class KdTree {
     public void insert(Point2D p) { // add the point to the set (if it is not already in the set)
         if (p == null) throw new IllegalArgumentException("insert point must not be null");
 
-//        points.add(p);
+        if (contains(p)) return;
         if (isEmpty()) rootNode = new KdNode(p);
         else rootNode.insert(p);
     }
@@ -173,7 +173,7 @@ public class KdTree {
 
             if (
                     (vertical && p.x() < point.x()) ||
-                            (!vertical && p.y() < point.y())
+                    (!vertical && p.y() < point.y())
             ) {
                 if (leftChild == null) return false;
                 return leftChild.contains(p);
@@ -232,11 +232,24 @@ public class KdTree {
             return nodes;
         }
 
-        public double distanceSquaredTo (Point2D p) {
+        public double distanceSquaredTo(Point2D p) {
             return point.distanceSquaredTo(p);
         }
 
-        public KdNode searchNearestNode (Point2D p, KdNode nearestSoFar) {
+        private KdNode searchPriorSide(Point2D p, KdNode nearestSoFar, KdNode firstNode, KdNode secondNode) {
+            if (firstNode == null) return secondNode.searchNearestNode(p, nearestSoFar);
+
+            nearestSoFar = firstNode.searchNearestNode(p, nearestSoFar);
+            if (nearestSoFar.distanceSquaredTo(p) < Math.pow(nearestSoFar.perpendicularDist(p), 2))
+                return nearestSoFar;
+
+            if (secondNode == null) return nearestSoFar;
+            return secondNode.searchNearestNode(p, nearestSoFar);
+        }
+
+        public KdNode searchNearestNode(Point2D p, KdNode nearestSoFar) {
+            if (this.point.equals(p)) return this;
+
             double thisDist = distanceSquaredTo(p);
             double thisPos = point.x();
             double pPos = p.x();
@@ -249,30 +262,16 @@ public class KdTree {
 
             if (leftChild == null && rightChild == null) return nearestSoFar;
 
-            if (pPos < thisPos) {
-//                go left
-                if (leftChild != null) {
-//                    go left
-                    nearestSoFar = leftChild.searchNearestNode(p, nearestSoFar);
-                    if (nearestSoFar.distanceSquaredTo(p) < thisDist) return nearestSoFar;
-                }
-
-                if (rightChild == null) return nearestSoFar;
-                return rightChild.searchNearestNode(p, nearestSoFar);
-            } else {
-//                go right
-                if (rightChild != null) {
-//                    go left
-                    nearestSoFar = rightChild.searchNearestNode(p, nearestSoFar);
-                    if (nearestSoFar.distanceSquaredTo(p) < thisDist) return nearestSoFar;
-                }
-
-                if (leftChild == null) return nearestSoFar;
-                return leftChild.searchNearestNode(p, nearestSoFar);
+            KdNode firstNode = leftChild;
+            KdNode secondNode = rightChild;
+            if (pPos >= thisPos) {
+                firstNode = rightChild;
+                secondNode = leftChild;
             }
+            return searchPriorSide(p, nearestSoFar, firstNode, secondNode);
         }
 
-        private boolean inRange (RectHV rect) {
+        private boolean inRange(RectHV rect) {
             if (point.x() < rect.xmin()) return false;
             if (point.x() > rect.xmax()) return false;
             if (point.y() < rect.ymin()) return false;
@@ -280,7 +279,7 @@ public class KdTree {
             return true;
         }
 
-        public void rangeSearch (RectHV rect, ArrayList<Point2D> points) {
+        public void rangeSearch(RectHV rect, ArrayList<Point2D> points) {
             double thisPos = point.x();
             double rectMax = rect.xmax();
             double rectMin = rect.xmin();
@@ -303,6 +302,13 @@ public class KdTree {
             }
             if (leftChild != null) leftChild.rangeSearch(rect, points);
             if (rightChild != null) rightChild.rangeSearch(rect, points);
+        }
+
+        private double perpendicularDist(Point2D p) {
+            if (isVertical()) {
+                return Math.abs(p.x() - point.x());
+            }
+            return Math.abs(p.y() - point.y());
         }
     }
 }
